@@ -49,10 +49,8 @@ EXIT_CANCELLED = 130
 STOP_GRACE_SEC = 5.0
 
 INSTALL_HINT = (
-    "media-dl が見つかりません。アプリのフォルダで次を実行して入れてください。\n"
-    "  npm install https://github.com/liasvistreamgamemusic-sketch/media-download/releases/download/"
-    "<tag>/liasvistreamgamemusic-sketch-media-dl-<version>.tgz\n"
-    "  npx media-dl setup\n"
+    "media-dl が見つかりません。アプリのフォルダで setup.bat を実行して入れてください"
+    "（入れ直すときは run.bat --media-dl setup）。\n"
     f"別の場所にある場合は環境変数 {ENV_MEDIA_DL} で実行ファイルを指定してください。"
 )
 UPDATE_HINT = (
