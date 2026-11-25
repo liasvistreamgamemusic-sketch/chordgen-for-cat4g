@@ -1,0 +1,2 @@
+# 精度の評価（python -m chordgen.eval）でだけ使う。scipy を引き込む
+mir_eval>=0.8

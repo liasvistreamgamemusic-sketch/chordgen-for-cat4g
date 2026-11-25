@@ -1,0 +1,13 @@
+{
+  "name": "chordgen-portable",
+  "version": "0.1.0",
+  "private": true,
+  "description": "chordgen ポータブル版が URL から音源を取るための media-dl（GitHub Release の tarball）。版を替えるときは下の URL だけを直す",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "dependencies": {
+    "@liasvistreamgamemusic-sketch/media-dl": "https://github.com/liasvistreamgamemusic-sketch/media-download/releases/download/v1.5.0/liasvistreamgamemusic-sketch-media-dl-0.1.0.tgz"
+  }
+}

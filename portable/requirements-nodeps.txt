@@ -1,0 +1,3 @@
+# 依存の宣言が torch の版と食い違うなど、依存を解決させたくないものだけを書く（pip install --no-deps で入れる）
+# ここに書いたものが要る依存は、ほかの requirements-*.txt に自分で書くこと
+# 例: some-package==1.2.3

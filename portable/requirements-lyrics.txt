@@ -1,0 +1,4 @@
+# 歌詞の位置合わせ（どちらも sdist。純 Python のビルドが走る）
+openai-whisper==20250625
+# torchaudio が必須。torch と同じ配布元・同じ版の torchaudio が先に入っている必要がある
+stable-ts>=2.19,<2.20

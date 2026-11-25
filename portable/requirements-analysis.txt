@@ -1,0 +1,8 @@
+# 解析に使うライブラリ（torch / torchaudio / torchvision は書かない。GPU ごとに install.py が先に入れる）
+# install.py は runtime/torch-constraints.txt を -c で渡すので、ここにあるものが torch を上書きすることはない
+# 音源分離（重みは HF_HOME に落ちる）
+demucs>=4.1.0,<5
+# 拍・ダウンビート（import に torchaudio が要る）
+beat-this>=1.1,<2
+# 特徴量・キー推定（numba・llvmlite を引き込む）
+librosa>=0.11,<1.1
