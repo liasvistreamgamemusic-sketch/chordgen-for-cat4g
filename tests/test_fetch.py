@@ -341,7 +341,7 @@ def test_path_lookup_and_missing(monkeypatch, tmp_path):
     with pytest.raises(FetchError) as ei:
         find_media_dl()
     assert ei.value.code == "MEDIA_DL_MISSING"
-    assert "npm install" in ei.value.user_message
+    assert "setup.bat" in ei.value.user_message
     exe = bin_dir / "media-dl"
     exe.write_text("#!/bin/sh\n")
     exe.chmod(0o755)
