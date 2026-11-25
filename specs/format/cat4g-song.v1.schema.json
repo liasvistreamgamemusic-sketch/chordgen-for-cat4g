@@ -1,0 +1,433 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cat4g-song.v1.schema.json",
+  "title": "CaT4G 1 曲ファイル(*.cat4g.json)形式の版 1",
+  "description": "項目の意味は specs/11_song_format.md を参照。数はすべて有限(NaN・Infinity は不可)。文字数はコードポイントで数える。",
+  "type": "object",
+  "properties": {
+    "format": { "const": "cat4g-song" },
+    "version": { "const": 1 },
+    "exportedAt": { "$ref": "#/definitions/dateTime" },
+    "appVersion": { "type": "string" },
+    "song": { "$ref": "#/definitions/songDocument" }
+  },
+  "required": ["format", "version", "exportedAt", "appVersion", "song"],
+  "additionalProperties": false,
+  "definitions": {
+    "songDocument": {
+      "description": "曲の文書。ライブラリファイルの songs[].song も同じ形",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "artist": { "type": ["string", "null"] },
+        "originalKey": { "type": ["string", "null"] },
+        "bpm": { "$ref": "#/definitions/nullableBpm" },
+        "timeSignature": { "$ref": "#/definitions/timeSignature" },
+        "capo": { "$ref": "#/definitions/capo" },
+        "transpose": { "$ref": "#/definitions/transpose" },
+        "playbackSpeed": { "$ref": "#/definitions/playbackSpeed" },
+        "tuning": { "$ref": "#/definitions/tuning" },
+        "difficulty": {
+          "anyOf": [{ "$ref": "#/definitions/difficulty" }, { "type": "null" }]
+        },
+        "sourceUrl": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "voicings": {
+          "description": "押さえる形の名前 → 押さえ方。実音のコード名ではなく、画面に出る形の名前に結びつく",
+          "type": "object",
+          "propertyNames": { "$ref": "#/definitions/voicingKey" },
+          "additionalProperties": { "$ref": "#/definitions/voicingData" }
+        },
+        "audio": { "$ref": "#/definitions/audio" },
+        "sections": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/definitions/section" }
+        },
+        "extensions": { "$ref": "#/definitions/extensions" }
+      },
+      "required": [
+        "title",
+        "artist",
+        "originalKey",
+        "bpm",
+        "timeSignature",
+        "capo",
+        "transpose",
+        "playbackSpeed",
+        "tuning",
+        "difficulty",
+        "sourceUrl",
+        "notes",
+        "tags",
+        "voicings",
+        "sections"
+      ],
+      "additionalProperties": false
+    },
+    "section": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "name": { "type": "string" },
+        "repeatCount": { "type": "integer", "minimum": 1, "maximum": 99 },
+        "capo": {
+          "description": "この区間のカポ(絶対値)。null は曲のカポを継承",
+          "anyOf": [{ "$ref": "#/definitions/capo" }, { "type": "null" }]
+        },
+        "transpose": {
+          "description": "この区間だけの表示用の移調(半音、相対)。null はなし",
+          "anyOf": [{ "$ref": "#/definitions/transpose" }, { "type": "null" }]
+        },
+        "bpm": { "$ref": "#/definitions/nullableBpm" },
+        "playbackSpeed": {
+          "anyOf": [
+            { "$ref": "#/definitions/playbackSpeed" },
+            { "type": "null" }
+          ]
+        },
+        "timeSignature": {
+          "anyOf": [
+            { "$ref": "#/definitions/timeSignature" },
+            { "type": "null" }
+          ]
+        },
+        "tempoChange": {
+          "anyOf": [{ "$ref": "#/definitions/tempoChange" }, { "type": "null" }]
+        },
+        "repeatMark": {
+          "anyOf": [{ "$ref": "#/definitions/repeatMark" }, { "type": "null" }]
+        },
+        "lines": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": { "$ref": "#/definitions/line" }
+        },
+        "extensions": { "$ref": "#/definitions/extensions" }
+      },
+      "required": [
+        "name",
+        "repeatCount",
+        "capo",
+        "transpose",
+        "bpm",
+        "playbackSpeed",
+        "timeSignature",
+        "tempoChange",
+        "repeatMark",
+        "lines"
+      ],
+      "additionalProperties": false
+    },
+    "line": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "lyrics": { "type": "string", "maxLength": 10000 },
+        "measures": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "memo": { "type": ["string", "null"] },
+        "chords": {
+          "type": "array",
+          "maxItems": 200,
+          "items": { "$ref": "#/definitions/chord" }
+        },
+        "lyricTimings": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/lyricTiming" }
+        },
+        "extensions": { "$ref": "#/definitions/extensions" }
+      },
+      "required": ["lyrics", "measures", "memo", "chords"],
+      "additionalProperties": false
+    },
+    "lyricTiming": {
+      "description": "歌詞の at 文字目(コードポイント単位)が、どの小節・拍・時刻で歌われるか",
+      "type": "object",
+      "properties": {
+        "at": { "type": "number", "minimum": 0 },
+        "bar": { "type": "integer", "minimum": 1 },
+        "beat": { "type": "number", "minimum": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["at"],
+      "additionalProperties": false
+    },
+    "chord": {
+      "type": "object",
+      "properties": {
+        "chord": {
+          "description": "実際に鳴る音(実音)のコード名",
+          "$ref": "#/definitions/chordName"
+        },
+        "position": {
+          "description": "歌詞の Unicode コードポイント単位の位置。小数可。歌詞の長さを超えてよい",
+          "type": "number",
+          "minimum": 0
+        },
+        "bar": {
+          "description": "区間の先頭から数えた小節番号(1 始まり)",
+          "type": "integer",
+          "minimum": 1
+        },
+        "beat": {
+          "description": "小節内の拍(1 始まり、小数可)。拍の単位は有効な拍子(section.timeSignature ?? song.timeSignature)の unit",
+          "type": "number",
+          "minimum": 1
+        },
+        "duration": {
+          "description": "長さ。beat と同じ単位の拍数",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "time": {
+          "description": "時刻(秒)。音源の再生位置は audio.offsetSec + time(offsetSec が無ければ 0)",
+          "type": "number",
+          "minimum": 0
+        },
+        "method": { "$ref": "#/definitions/playingMethod" },
+        "strokePattern": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "$ref": "#/definitions/strokeDirection" }
+        },
+        "arpeggioOrder": {
+          "description": "弾く弦の順番(1 弦〜6 弦)。同時に弾く弦は配列",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "$ref": "#/definitions/stringNumber" },
+              {
+                "type": "array",
+                "items": { "$ref": "#/definitions/stringNumber" }
+              }
+            ]
+          }
+        },
+        "subdivision": { "$ref": "#/definitions/subdivision" },
+        "techniques": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/playingTechnique" }
+        },
+        "dynamics": { "$ref": "#/definitions/dynamics" },
+        "tieToNext": { "type": "boolean" },
+        "annotation": { "type": "string" },
+        "voicing": { "$ref": "#/definitions/chordVoicing" },
+        "extensions": { "$ref": "#/definitions/chordExtensions" }
+      },
+      "required": ["chord", "position"],
+      "additionalProperties": false
+    },
+    "chordVoicing": {
+      "description": "このコードだけの押さえ方。表示中の形の名前が shape と一致するときだけ使う",
+      "type": "object",
+      "properties": {
+        "shape": { "$ref": "#/definitions/shapeName" },
+        "fingering": { "$ref": "#/definitions/voicingData" }
+      },
+      "required": ["shape", "fingering"],
+      "additionalProperties": false
+    },
+    "voicingData": {
+      "description": "押さえ方の実データ。配列の並びは 1 弦 → 6 弦",
+      "type": "object",
+      "properties": {
+        "frets": {
+          "description": "各弦のフレット。null は弾かない弦",
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "anyOf": [{ "$ref": "#/definitions/fret" }, { "type": "null" }]
+          }
+        },
+        "fingers": {
+          "description": "各弦の指番号(0 = 押さえない、1〜4 = 人差し指〜小指)",
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": { "type": ["integer", "null"], "minimum": 0, "maximum": 4 }
+        },
+        "barreAt": {
+          "anyOf": [{ "$ref": "#/definitions/fret" }, { "type": "null" }]
+        },
+        "barreStrings": {
+          "description": "バレーする弦の範囲 [始め, 終わり]。0 始まりの位置(0 = 1 弦、5 = 6 弦)",
+          "type": ["array", "null"],
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "integer", "minimum": 0, "maximum": 5 }
+        },
+        "baseFret": { "type": "integer", "minimum": 1, "maximum": 24 },
+        "muted": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": { "type": "boolean" }
+        },
+        "name": { "type": "string" }
+      },
+      "required": [
+        "frets",
+        "fingers",
+        "barreAt",
+        "barreStrings",
+        "baseFret",
+        "muted"
+      ],
+      "additionalProperties": false
+    },
+    "audio": {
+      "description": "time の基準になる音源の情報。音源そのものは含めない",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "durationSec": { "type": "number", "minimum": 0 },
+        "offsetSec": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "timeSignature": {
+      "type": "object",
+      "properties": {
+        "beats": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "unit": { "$ref": "#/definitions/timeSignatureUnit" }
+      },
+      "required": ["beats", "unit"],
+      "additionalProperties": false
+    },
+    "extensions": {
+      "description": "自由な JSON オブジェクト。アプリは中身を解釈せずに保つ。どの深さでも __proto__ / constructor / prototype はキーにできない。入れ子の深さの上限(extensions 自体を 1 段目として 64 段)はアプリだけが検査する",
+      "type": "object",
+      "propertyNames": { "$ref": "#/definitions/allowedKey" },
+      "additionalProperties": { "$ref": "#/definitions/extensionValue" }
+    },
+    "chordExtensions": {
+      "description": "コードの extensions。cat4g.legacyChordName はアプリが使う(旧データの綴りの記録)",
+      "type": "object",
+      "propertyNames": { "$ref": "#/definitions/allowedKey" },
+      "properties": {
+        "cat4g.legacyChordName": { "$ref": "#/definitions/chordName" }
+      },
+      "additionalProperties": { "$ref": "#/definitions/extensionValue" }
+    },
+    "extensionValue": {
+      "anyOf": [
+        {
+          "type": "object",
+          "propertyNames": { "$ref": "#/definitions/allowedKey" },
+          "additionalProperties": { "$ref": "#/definitions/extensionValue" }
+        },
+        {
+          "type": "array",
+          "items": { "$ref": "#/definitions/extensionValue" }
+        },
+        { "type": ["string", "number", "boolean", "null"] }
+      ]
+    },
+    "allowedKey": {
+      "not": { "enum": ["__proto__", "constructor", "prototype"] }
+    },
+    "voicingKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "not": { "enum": ["__proto__", "constructor", "prototype"] }
+    },
+    "id": {
+      "description": "区間・行の任意の id。書き出すときは取り除き、読み込むときは振り直す",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "dateTime": {
+      "description": "ISO 8601 の日時(例 2026-11-11T09:00:00.000Z)。日時として読めること(2026-13-45 などを弾く)はアプリだけが検査する",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "chordName": {
+      "description": "コード名。空も可(画面で空のまま保存できるため)",
+      "type": "string",
+      "maxLength": 200
+    },
+    "shapeName": {
+      "description": "押さえる形の名前。押さえ方を結びつけるキーなので空は不可",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "capo": { "type": "integer", "minimum": -12, "maximum": 24 },
+    "transpose": { "type": "integer", "minimum": -24, "maximum": 24 },
+    "nullableBpm": { "type": ["number", "null"], "minimum": 1, "maximum": 999 },
+    "playbackSpeed": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 10
+    },
+    "fret": { "type": "integer", "minimum": 0, "maximum": 24 },
+    "stringNumber": { "type": "integer", "minimum": 1, "maximum": 6 },
+    "timeSignatureUnit": { "type": "integer", "enum": [1, 2, 4, 8, 16] },
+    "tuning": {
+      "type": "string",
+      "enum": [
+        "standard",
+        "half-step-down",
+        "whole-step-down",
+        "drop-d",
+        "dadgad",
+        "open-g",
+        "open-d",
+        "custom"
+      ]
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["beginner", "intermediate", "advanced"]
+    },
+    "tempoChange": { "type": "string", "enum": ["rit", "accel", "a tempo"] },
+    "repeatMark": {
+      "type": "string",
+      "enum": [
+        "D.C.",
+        "D.S.",
+        "D.C. al Fine",
+        "D.S. al Fine",
+        "D.C. al Coda",
+        "D.S. al Coda",
+        "Fine",
+        "Segno",
+        "Coda"
+      ]
+    },
+    "playingMethod": { "type": "string", "enum": ["stroke", "arpeggio"] },
+    "strokeDirection": {
+      "type": "string",
+      "enum": ["down", "up", "mute", "rest"]
+    },
+    "playingTechnique": {
+      "type": "string",
+      "enum": [
+        "hammer-on",
+        "pull-off",
+        "slide-up",
+        "slide-down",
+        "bend",
+        "vibrato",
+        "palm-mute",
+        "harmonic",
+        "let-ring",
+        "accent"
+      ]
+    },
+    "dynamics": {
+      "type": "string",
+      "enum": ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"]
+    },
+    "subdivision": {
+      "description": "パターン 1 要素の音価(4 分・8 分・16 分・8 分 3 連・16 分 3 連)",
+      "type": "string",
+      "enum": ["4", "8", "16", "8t", "16t"]
+    }
+  }
+}

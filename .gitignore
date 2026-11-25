@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+node_modules/
+# ポータブル版がアプリのフォルダに置くもの（リポジトリには入れない）
+/runtime/
+/models/
+/work/
+/output/
+/cache/
+/third_party/
+# 音源・重み
+*.wav
+*.mp3
+*.flac
+*.m4a
+*.pt
+*.pth
+!tests/fixtures/**/*.wav

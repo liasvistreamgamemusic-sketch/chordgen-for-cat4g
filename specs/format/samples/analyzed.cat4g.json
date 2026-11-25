@@ -1,0 +1,170 @@
+{
+  "format": "cat4g-song",
+  "version": 1,
+  "exportedAt": "2026-11-11T09:00:00.000Z",
+  "appVersion": "sample-analyzer 0.1.0",
+  "song": {
+    "title": "しろいくも",
+    "artist": "サンプル",
+    "originalKey": "A",
+    "bpm": 90,
+    "timeSignature": { "beats": 4, "unit": 4 },
+    "capo": 2,
+    "transpose": 0,
+    "playbackSpeed": 1,
+    "tuning": "standard",
+    "difficulty": null,
+    "sourceUrl": null,
+    "notes": "解析結果のサンプル。コード名は実音。カポ 2 なので、画面には G・C・D・Em の形で出る",
+    "tags": ["解析"],
+    "voicings": {},
+    "audio": {
+      "title": "しろいくも(自作のデモ音源)",
+      "url": "https://example.com/audio/shiroikumo.mp3",
+      "durationSec": 64,
+      "offsetSec": 1.2
+    },
+    "sections": [
+      {
+        "name": "イントロ",
+        "repeatCount": 1,
+        "capo": null,
+        "transpose": null,
+        "bpm": null,
+        "playbackSpeed": null,
+        "timeSignature": null,
+        "tempoChange": null,
+        "repeatMark": null,
+        "lines": [
+          {
+            "lyrics": "",
+            "measures": 2,
+            "memo": null,
+            "chords": [
+              {
+                "chord": "A",
+                "position": 0,
+                "bar": 1,
+                "beat": 1,
+                "duration": 4,
+                "time": 0,
+                "extensions": { "analyzer.confidence": 0.95 }
+              },
+              {
+                "chord": "E",
+                "position": 4,
+                "bar": 2,
+                "beat": 1,
+                "duration": 4,
+                "time": 2.667,
+                "extensions": { "analyzer.confidence": 0.9 }
+              }
+            ]
+          }
+        ],
+        "extensions": { "analyzer.sectionLabel": "intro" }
+      },
+      {
+        "name": "Aメロ",
+        "repeatCount": 1,
+        "capo": null,
+        "transpose": null,
+        "bpm": null,
+        "playbackSpeed": null,
+        "timeSignature": null,
+        "tempoChange": null,
+        "repeatMark": null,
+        "lines": [
+          {
+            "lyrics": "そらにうかぶ しろいくも",
+            "measures": 2,
+            "memo": null,
+            "chords": [
+              {
+                "chord": "A",
+                "position": 0,
+                "bar": 1,
+                "beat": 1,
+                "duration": 4,
+                "time": 5.333,
+                "extensions": { "analyzer.confidence": 0.93 }
+              },
+              {
+                "chord": "D",
+                "position": 7,
+                "bar": 2,
+                "beat": 1,
+                "duration": 2,
+                "time": 8,
+                "extensions": { "analyzer.confidence": 0.81 }
+              },
+              {
+                "chord": "E",
+                "position": 10,
+                "bar": 2,
+                "beat": 3,
+                "duration": 2,
+                "time": 9.333,
+                "extensions": { "analyzer.confidence": 0.77 }
+              }
+            ],
+            "lyricTimings": [
+              { "at": 0, "bar": 1, "beat": 1, "time": 5.333 },
+              { "at": 3, "bar": 1, "beat": 3, "time": 6.667 },
+              { "at": 7, "bar": 2, "beat": 1, "time": 8 },
+              { "at": 10, "bar": 2, "beat": 3, "time": 9.333 }
+            ]
+          },
+          {
+            "lyrics": "ゆっくりあるいて かえろうよ",
+            "measures": 2,
+            "memo": null,
+            "chords": [
+              {
+                "chord": "F#m",
+                "position": 0,
+                "bar": 3,
+                "beat": 1,
+                "duration": 4,
+                "time": 10.667,
+                "extensions": { "analyzer.confidence": 0.88 }
+              },
+              {
+                "chord": "D",
+                "position": 8.5,
+                "bar": 4,
+                "beat": 1,
+                "duration": 2,
+                "time": 13.333,
+                "extensions": { "analyzer.confidence": 0.84 }
+              },
+              {
+                "chord": "E",
+                "position": 12,
+                "bar": 4,
+                "beat": 3,
+                "duration": 2,
+                "time": 14.667,
+                "extensions": { "analyzer.confidence": 0.79 }
+              }
+            ],
+            "lyricTimings": [
+              { "at": 0, "bar": 3, "beat": 1, "time": 10.667 },
+              { "at": 4, "bar": 3, "beat": 3, "time": 12 },
+              { "at": 9, "bar": 4, "beat": 1, "time": 13.333 }
+            ]
+          }
+        ],
+        "extensions": {
+          "analyzer.sectionLabel": "verse",
+          "analyzer.confidence": 0.82
+        }
+      }
+    ],
+    "extensions": {
+      "analyzer.name": "sample-analyzer",
+      "analyzer.version": "0.1.0",
+      "analyzer.keyConfidence": 0.88
+    }
+  }
+}
