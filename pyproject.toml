@@ -13,6 +13,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# 解析に使うライブラリ。torch / torchaudio を先に入れてから入れる（PyPI の torch で上書きさせない）
+analysis = [
+    "demucs>=4.1.0,<5",
+    "beat-this>=1.1,<2",
+    "librosa>=0.11,<1.1",
+    "openai-whisper==20250625",
+    "stable-ts>=2.19,<2.20",
+]
+# 精度の比較（python -m chordgen.eval）
+eval = ["mir_eval>=0.8"]
 
 [project.scripts]
 chordgen = "chordgen.cli:main"
