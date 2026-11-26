@@ -52,8 +52,9 @@ except Exception as e:
     print(json.dumps({"kind": "cpu", "name": None, "torchAvailable": False, "detail": f"{type(e).__name__}: {e}"}))
     raise SystemExit(0)
 try:
-    ok = bool(torch.cuda.is_available())
-    name = torch.cuda.get_device_name(0) if ok else None
+    from chordgen.device import select_gpu  # 解析と同じ規則で選んだ GPU の名前を出す
+    gpu = select_gpu()
+    ok, name = gpu is not None, (gpu.name if gpu else None)
 except Exception as e:
     ok, name = False, None
 print(json.dumps({"kind": "cuda" if ok else "cpu", "name": name, "torchAvailable": True}))
