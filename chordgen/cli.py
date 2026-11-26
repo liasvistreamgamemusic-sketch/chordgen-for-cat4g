@@ -1,13 +1,23 @@
 """コマンドライン: chordgen <音源ファイルか URL> [オプション]
 
 終了コード: 成功 0、失敗 1、引数の誤り 2、Ctrl+C 130（URL の取得の失敗は media-dl の終了コード）。
+
+--progress-json をつけると、標準出力に 1 行 1 JSON で進捗を出す（GUI が子プロセスとして読む）。
+人向けの表示は標準エラーに出す。
+  {"type":"progress", ...ProgressEvent のフィールド}
+  {"type":"warning","message":...}
+  {"type":"done","output":"絶対パス","title":...}
+  {"type":"error","code":...,"message":...,"stage":...|null,"exitCode":...}
 """
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import json
 import logging
 import sys
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -48,7 +58,10 @@ class _JapaneseHelpFormatter(argparse.RawDescriptionHelpFormatter):
 
 
 class _Parser(argparse.ArgumentParser):
+    last_error: str | None = None
+
     def error(self, message: str):  # 引数の誤りは終了コード 2
+        self.last_error = message
         self.print_usage(sys.stderr)
         self.exit(EXIT_USAGE, f"{self.prog}: 引数の誤り: {message}\n")
 
@@ -98,6 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bars-per-line", metavar="小節数", type=_bars_per_line, default=DEFAULT_BARS_PER_LINE,
                    help=f"歌詞がないときに 1 行に入れる小節の数（既定 {DEFAULT_BARS_PER_LINE}）")
     p.add_argument("--keep-work", action="store_true", help="作業フォルダ（取得した音源・分離した音）を消さずに残す")
+    p.add_argument("--work-dir", metavar="フォルダ", type=Path,
+                   help="作業フォルダを作る場所（既定はアプリの work フォルダ）")
+    p.add_argument("--progress-json", action="store_true",
+                   help="進捗・警告・結果を標準出力に 1 行 1 JSON で出す（GUI 用。人向けの表示は標準エラーに出す）")
     p.add_argument("-v", "--verbose", action="store_true", help="詳しいログと、失敗したときのトレースバックを出す")
     return p
 
@@ -169,6 +186,58 @@ def _percent(data: dict[str, Any]) -> float | None:
     if isinstance(done, (int, float)) and isinstance(total, (int, float)) and total > 0:
         return 100.0 * done / total
     return None
+
+
+class _JsonEmitter:
+    """--progress-json の出力。stream には元の標準出力を渡す。"""
+
+    def __init__(self, stream: TextIO | None, progress_interval: float = 0.25):
+        self.stream = stream
+        self.progress_interval = progress_interval
+        self._lock = threading.Lock()
+        self._last_progress = 0.0
+
+    def emit(self, obj: dict[str, Any]) -> None:
+        if self.stream is None:
+            return
+        line = json.dumps(obj, ensure_ascii=False, default=str)
+        with self._lock:
+            try:
+                self.stream.write(line + "\n")
+                self.stream.flush()
+            except (OSError, ValueError):  # 読む側が先に閉じたとき
+                pass
+
+    def progress(self, ev: ProgressEvent) -> None:
+        if ev.status == "progress":  # 取得中の progress は間引く（start / done などは全部出す）
+            now = time.monotonic()
+            if now - self._last_progress < self.progress_interval:
+                return
+            self._last_progress = now
+        self.emit({"type": "progress", **dataclasses.asdict(ev)})
+
+    def warning(self, message: str) -> None:
+        self.emit({"type": "warning", "message": message})
+
+    def done(self, output: Path, title: str | None) -> None:
+        self.emit({"type": "done", "output": str(output), "title": title})
+
+    def error(self, code: str, message: str, stage: str | None, exit_code: int) -> None:
+        self.emit({"type": "error", "code": code, "message": message, "stage": stage, "exitCode": exit_code})
+
+
+class _JsonWarningHandler(logging.Handler):
+    """chordgen.* のログの警告を --progress-json の warning にする。"""
+
+    def __init__(self, out: _JsonEmitter):
+        super().__init__(logging.WARNING)
+        self.out = out
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self.out.warning(record.getMessage())
+        except Exception:
+            pass
 
 
 class _WarningFormatter(logging.Formatter):
@@ -245,46 +314,76 @@ def _read_lyrics(path: Path) -> str:
     return path.read_text(encoding="utf-8-sig")
 
 
+def _output_title(path: Path) -> str | None:
+    """書き出したファイルの題名（--progress-json の done に入れる）。"""
+    try:
+        title = json.loads(path.read_text(encoding="utf-8"))["song"]["title"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    return title if isinstance(title, str) else None
+
+
 def main(argv: list[str] | None = None) -> int:
     _setup_stdio()
+    argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_parser()
+    # 引数の誤りも JSON で知らせるため、解析の前に見ておく
+    out = _JsonEmitter(sys.stdout if "--progress-json" in argv else None)
     try:
         args = parser.parse_args(argv)
     except SystemExit as e:  # --help / --version は 0、引数の誤りは 2
-        return e.code if isinstance(e.code, int) else EXIT_USAGE
+        code = e.code if isinstance(e.code, int) else EXIT_USAGE
+        if code != 0:
+            out.error("USAGE", f"引数の誤り: {getattr(parser, 'last_error', None) or ''}".rstrip(": "), None, code)
+        return code
 
     handler = _setup_logging(args.verbose)
+    log = logging.getLogger("chordgen")
+    json_handler = _JsonWarningHandler(out) if args.progress_json else None
+    if json_handler is not None:
+        log.addHandler(json_handler)
+    saved_stdout = sys.stdout
+    if args.progress_json:
+        # 標準出力は JSON だけにする（ライブラリの print や人向けの表示は標準エラーへ）
+        sys.stdout = sys.stderr
     try:
-        return _main(args, parser)
+        return _main(args, parser, out)
     except KeyboardInterrupt:
         _err("中断しました。")
+        out.error("INTERRUPTED", "中断しました。", None, EXIT_INTERRUPTED)
         return EXIT_INTERRUPTED
     finally:
-        logging.getLogger("chordgen").removeHandler(handler)
+        sys.stdout = saved_stdout
+        log.removeHandler(handler)
+        if json_handler is not None:
+            log.removeHandler(json_handler)
 
 
-def _main(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+def _usage_error(out: _JsonEmitter, code: str, message: str) -> int:
+    _err(f"エラー: {message}")
+    out.error(code, message, None, EXIT_USAGE)
+    return EXIT_USAGE
+
+
+def _main(args: argparse.Namespace, parser: argparse.ArgumentParser, out: _JsonEmitter | None = None) -> int:
     from chordgen import pipeline
 
+    out = out or _JsonEmitter(None)
     lyrics_text = None
     if args.lyrics is not None:
         try:
             lyrics_text = _read_lyrics(args.lyrics)
         except FileNotFoundError:
-            _err(f"エラー: 歌詞のファイルが見つかりません: {args.lyrics}")
-            return EXIT_USAGE
+            return _usage_error(out, "LYRICS_NOT_FOUND", f"歌詞のファイルが見つかりません: {args.lyrics}")
         except UnicodeDecodeError:
-            _err(f"エラー: 歌詞のファイルを UTF-8 として読めません: {args.lyrics}")
-            return EXIT_USAGE
+            return _usage_error(out, "LYRICS_NOT_UTF8", f"歌詞のファイルを UTF-8 として読めません: {args.lyrics}")
         except OSError as e:
-            _err(f"エラー: 歌詞のファイルを読めません: {args.lyrics}（{e}）")
-            return EXIT_USAGE
+            return _usage_error(out, "LYRICS_UNREADABLE", f"歌詞のファイルを読めません: {args.lyrics}（{e}）")
 
     try:
         pipeline.classify_source(args.source)
     except FileNotFoundError as e:
-        _err(f"エラー: {e}（URL なら http:// か https:// から書いてください）")
-        return EXIT_USAGE
+        return _usage_error(out, "SOURCE_NOT_FOUND", f"{e}（URL なら http:// か https:// から書いてください）")
 
     options = PipelineOptions(
         device=args.device,
@@ -295,61 +394,90 @@ def _main(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
         lyrics_language=args.language,
         keep_work=args.keep_work,
         bars_per_line=args.bars_per_line,
+        work_dir=args.work_dir,
     )
     try:
         options.validate()
     except ValueError as e:
-        _err(f"エラー: {e}")
-        return EXIT_USAGE
+        return _usage_error(out, "INVALID_OPTIONS", str(e))
+
+    printer = _ProgressPrinter(sys.stderr, args.verbose)
+
+    def on_progress(ev: ProgressEvent) -> None:
+        printer(ev)
+        out.progress(ev)
 
     t0 = time.perf_counter()
     try:
-        out = pipeline.run(
+        out_path = pipeline.run(
             args.source,
             args.output,
             lyrics_text=lyrics_text,
             title=args.title,
             artist=args.artist,
             options=options,
-            on_progress=_ProgressPrinter(sys.stderr, args.verbose),
+            on_progress=on_progress,
         )
     except KeyboardInterrupt:
         raise
     except Exception as e:
-        return _report_failure(e, args.verbose)
+        return _report_failure(e, args.verbose, out)
 
     if args.verbose:
         _err(f"合計 {time.perf_counter() - t0:.1f} 秒")
-    print(f"{out.resolve()} に書き出しました。cat4g の読み込みでこのファイルを開いてください。", flush=True)
+    path = out_path.resolve()
+    # --progress-json のときは標準出力を標準エラーに向けてあるので、この行は標準エラーに出る
+    print(f"{path} に書き出しました。cat4g の読み込みでこのファイルを開いてください。", flush=True)
+    out.done(path, _output_title(path))
     return EXIT_OK
 
 
-def _report_failure(exc: BaseException, verbose: bool) -> int:
+def _failed_stage(exc: BaseException) -> str | None:
+    for e in _cause_chain(exc):
+        if isinstance(e, StageError):
+            return e.stage
+    return None
+
+
+def _report_failure(exc: BaseException, verbose: bool, out: _JsonEmitter | None = None) -> int:
+    out = out or _JsonEmitter(None)
+    stage = _failed_stage(exc)
     fe = _find_fetch_error(exc)
     if fe is not None:
         code = getattr(fe, "code", None)
         msg = getattr(fe, "user_message", None) or str(fe)
         _err(f"エラー: 音源を取得できませんでした: {msg}" + (f"（{code}）" if code else ""))
         if code == "ENGINE_OUTDATED" and "update" not in msg:
-            _err("  media-dl update で yt-dlp を更新してから、もう一度試してください。")
+            hint = "media-dl update で yt-dlp を更新してから、もう一度試してください。"
+            _err(f"  {hint}")
+            msg = f"{msg}\n{hint}"
         if verbose:
             traceback.print_exception(exc, file=sys.stderr)
         exit_code = getattr(fe, "exit_code", None)
-        return exit_code if isinstance(exit_code, int) and exit_code != 0 else EXIT_FAIL
+        exit_code = exit_code if isinstance(exit_code, int) and exit_code != 0 else EXIT_FAIL
+        out.error(str(code or "FETCH_FAILED"), f"音源を取得できませんでした: {msg}", stage or "fetch", exit_code)
+        return exit_code
 
     problems = _validation_errors(exc)
     if problems is not None:
-        _err("エラー: 書き出す文書が JSON Schema の検証を通らなかったので、書き出しませんでした。通らなかった項目:")
+        head = "書き出す文書が JSON Schema の検証を通らなかったので、書き出しませんでした。通らなかった項目:"
+        _err(f"エラー: {head}")
         for line in problems:
             _err(f"  {line}")
+        code, message = "VALIDATION_FAILED", "\n".join([head, *(f"  {x}" for x in problems)])
     elif isinstance(exc, StageError):
-        _err(f"エラー: {exc.label}で失敗しました: {type(exc.cause).__name__}: {exc.cause}")
+        message = f"{exc.label}で失敗しました: {type(exc.cause).__name__}: {exc.cause}"
+        _err(f"エラー: {message}")
+        code = "STAGE_FAILED"
     else:
-        _err(f"エラー: {type(exc).__name__}: {exc}")
+        message = f"{type(exc).__name__}: {exc}"
+        _err(f"エラー: {message}")
+        code = "UNEXPECTED"
     if verbose:
         traceback.print_exception(exc, file=sys.stderr)
     else:
         _err("  詳しくは -v をつけて実行してください。")
+    out.error(code, message, stage, EXIT_FAIL)
     return EXIT_FAIL
 
 

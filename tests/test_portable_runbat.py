@@ -171,7 +171,7 @@ def test_flow_labels_exist():
 def test_run_invokes_cli_and_setup():
     text = _text(RUN_BAT)
     assert '"%CHORDGEN_PYTHON%" -P -s -m chordgen.cli %*' in text
-    assert '"%CHORDGEN_PYTHON%" -P -s -m chordgen.cli --help' in text  # 引数なしならヘルプ
+    assert '"%CHORDGEN_PYTHON%" -P -s -m chordgen.gui' in text  # 引数なしなら画面（tests/test_gui_runbat.py）
     assert r'"%CHORDGEN_HOME%\portable\install.py"' in text
     assert r'-ExecutionPolicy Bypass -File "%CHORDGEN_HOME%\portable\bootstrap.ps1"' in text
     assert r'if not exist "%CG_RUNTIME%\setup-complete.json" goto setup_auto' in text

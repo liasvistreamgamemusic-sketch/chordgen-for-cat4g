@@ -12,7 +12,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+# httpx は fastapi の TestClient が使う
+dev = ["pytest", "httpx", "chordgen[gui]"]
+# ブラウザで使う画面（python -m chordgen.gui）。ポータブル版は portable/requirements-gui.txt で入れる
+gui = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.18",
+]
 # 解析に使うライブラリ。torch / torchaudio を先に入れてから入れる（PyPI の torch で上書きさせない）
 analysis = [
     "demucs>=4.1.0,<5",

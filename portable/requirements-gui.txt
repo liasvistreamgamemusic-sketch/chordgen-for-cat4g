@@ -1,0 +1,6 @@
+# ブラウザで使う画面（run.bat を引数なしで起動したときの python -m chordgen.gui）
+# uvicorn は [standard] にしない（uvloop などは要らない。Windows では入らないものもある）
+fastapi>=0.115
+uvicorn>=0.30
+# multipart/form-data（音源のアップロード）を読む
+python-multipart>=0.0.18

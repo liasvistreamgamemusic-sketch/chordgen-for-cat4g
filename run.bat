@@ -4,7 +4,9 @@ rem chordgen portable launcher. Keep this file ASCII-only: cmd.exe reads .bat fi
 rem console code page (932 on Japanese Windows), so UTF-8 text here can break parsing.
 rem Details (in Japanese) are in README.md.
 rem
-rem   run.bat <audio file or URL> [options]     analyze (no arguments: show help)
+rem   run.bat                                   start the browser GUI (python -m chordgen.gui)
+rem   run.bat --gui [--port N] [--no-browser]   start the GUI with options
+rem   run.bat <audio file or URL> [options]     analyze on the command line (run.bat --help for help)
 rem   run.bat --setup [--gpu amd|nvidia|cpu]    run setup only (same as setup.bat)
 rem   run.bat --media-dl <args>                 call the bundled media-dl (e.g. update)
 rem   run.bat --python <args>                   call the bundled Python (e.g. -m chordgen.eval --help)
@@ -145,8 +147,23 @@ set "CG_RC=1"
 goto end
 
 :run
-if not "%~1"=="" goto run_args
-"%CHORDGEN_PYTHON%" -P -s -m chordgen.cli --help
+if "%~1"=="" goto gui
+if /i "%~1"=="--gui" goto gui_opts
+goto run_args
+
+rem no arguments (e.g. double-clicked): start the GUI. On failure keep the window open
+rem so the message can be read.
+:gui
+"%CHORDGEN_PYTHON%" -P -s -m chordgen.gui
+set "CG_RC=%ERRORLEVEL%"
+if not "%CG_RC%"=="0" pause
+goto end
+
+:gui_opts
+set "CG_NEXT=gui_call"
+goto collect_args
+:gui_call
+"%CHORDGEN_PYTHON%" -P -s -m chordgen.gui%CG_ARGS%
 set "CG_RC=%ERRORLEVEL%"
 goto end
 
