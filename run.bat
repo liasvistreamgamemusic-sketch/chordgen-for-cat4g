@@ -33,8 +33,13 @@ set "XDG_CONFIG_HOME=%CG_CACHE%\config"
 rem MIOpen tuning db and kernel cache
 set "MIOPEN_USER_DB_PATH=%CG_CACHE%\miopen\db"
 set "MIOPEN_CUSTOM_CACHE_DIR=%CG_CACHE%\miopen\kernels"
+rem MIOpen: errors only (its warnings about tuning files are harmless)
+set "MIOPEN_LOG_LEVEL=3"
 rem model weights
 set "HF_HOME=%CG_MODELS%\huggingface"
+rem Hugging Face: no symlinks on Windows without Developer Mode (works, just warns); no telemetry
+set "HF_HUB_DISABLE_SYMLINKS_WARNING=1"
+set "HF_HUB_DISABLE_TELEMETRY=1"
 set "TORCH_HOME=%CG_MODELS%\torch"
 rem Triton, pip and deno caches
 set "TRITON_CACHE_DIR=%CG_CACHE%\triton"
