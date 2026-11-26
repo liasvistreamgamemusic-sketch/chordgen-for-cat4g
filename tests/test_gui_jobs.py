@@ -141,7 +141,13 @@ def test_success_and_args(make_manager, tmp_path, app_home):
     assert argv[argv.index("--bars-per-line") + 1] == "2"
     # 終わったら作業フォルダを消す
     assert not job.work_dir.exists()
-    saved = json.loads((app_home / "work" / "gui" / "jobs.json").read_text(encoding="utf-8"))
+    # jobs.json は status を変えた直後に書く（少し遅れることがあるので待つ）
+    deadline = time.monotonic() + 5
+    while True:
+        saved = json.loads((app_home / "work" / "gui" / "jobs.json").read_text(encoding="utf-8"))
+        if saved["jobs"][0]["status"] == "done" or time.monotonic() > deadline:
+            break
+        time.sleep(0.02)
     assert saved["jobs"][0]["id"] == job.id and saved["jobs"][0]["status"] == "done"
 
 
@@ -173,6 +179,10 @@ def test_done_with_nonzero_exit_is_failure(make_manager):
 
 
 def _alive(pid: int) -> bool:
+    if os.name == "nt":
+        from chordgen.gui.__main__ import pid_alive
+
+        return pid_alive(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -187,7 +197,6 @@ def _alive(pid: int) -> bool:
         return True
 
 
-@pytest.mark.skipif(os.name == "nt", reason="POSIX のプロセスグループで確かめる")
 def test_cancel_running_kills_tree(make_manager, tmp_path):
     pidfile = tmp_path / "gc.pid"
     m = make_manager({"grandchild_pidfile": str(pidfile),

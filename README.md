@@ -218,7 +218,9 @@ CHORDGEN_GUI_FAKE=1 .venv/bin/python -m chordgen.gui
 ### まだ確かめていないこと
 
 - Windows の実機での起動（WSL の中から cmd.exe で run.bat の環境変数の設定までは確かめた）。
-  画面のサーバーの起動・ブラウザの自動起動・中止のときの `taskkill /T /F` も、Windows の実機ではまだ確かめていません。
+  画面は、Windows の Python 3.12 で `run.bat --gui --no-browser`（cmd.exe）から偽のジョブまで動くことと、
+  中止のときの `taskkill /T /F` で孫のプロセスまで止まることを確かめた。ブラウザの自動起動と、
+  本物の解析（torch を使う段）を画面から走らせることは、まだ確かめていない。
 - media-dl の tarball は、まだ GitHub Release に添付されていません。`package.json` の URL
   （タグ `v1.5.0` は仮）は、添付されたら実際のタグに直してください。取得できない間は、セットアップは
   media-dl を飛ばして続け、ファイルの入力だけが使えます。
