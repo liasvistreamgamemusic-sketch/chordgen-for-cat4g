@@ -32,6 +32,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from chordgen.paths import app_home
+from chordgen.proc import kill_tree
 from chordgen.types import FetchResult, TrackMeta
 
 log = logging.getLogger(__name__)
@@ -201,27 +202,7 @@ def find_media_dl() -> list[str]:
 # ---- 子プロセスの実行 ----
 
 
-def _kill_tree(proc: subprocess.Popen) -> None:
-    """子とその子（yt-dlp・ffmpeg）を止める。"""
-    if proc.poll() is not None:
-        return
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-                timeout=10,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-    if proc.poll() is None:
-        proc.kill()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        pass
+_kill_tree = kill_tree  # 子とその子（yt-dlp・ffmpeg）を止める。中身は chordgen.proc
 
 
 def _stop(proc: subprocess.Popen) -> None:

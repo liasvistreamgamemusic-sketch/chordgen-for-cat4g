@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>chordgen</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23304a9e'/%3E%3Cpath d='M9 22V9l14-3v13' fill='none' stroke='white' stroke-width='2.4'/%3E%3Ccircle cx='7' cy='22' r='3' fill='white'/%3E%3Ccircle cx='21' cy='19' r='3' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="app.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<a class="skip" href="#result">結果へ移る</a>
+
+<header class="appbar">
+  <div class="appbar-name">
+    <span class="appbar-title">chordgen</span>
+    <span class="appbar-sub">cat4g のコード譜の下書きを作る</span>
+    <span class="appbar-version" id="app-version"></span>
+  </div>
+  <div class="appbar-device" id="device" aria-live="polite">
+    <span class="device-dot" aria-hidden="true"></span>
+    <span id="device-text">サーバーに接続しています…</span>
+  </div>
+  <button type="button" class="btn btn-quiet" id="shutdown-btn">終了</button>
+</header>
+
+<div class="banner" id="banner" role="alert" hidden></div>
+
+<main class="layout">
+  <div class="col col-left">
+
+    <section class="panel" aria-labelledby="input-heading">
+      <h2 id="input-heading" class="panel-title">音源と歌詞</h2>
+      <form id="job-form" novalidate>
+        <div class="field">
+          <span class="label" id="file-label">音源ファイル</span>
+          <div class="drop" id="drop">
+            <input type="file" id="file-input" hidden tabindex="-1"
+                   accept="audio/*,video/*,.wav,.mp3,.flac,.m4a,.aac,.ogg,.opus,.wma,.aiff,.aif,.mp4,.webm,.mkv">
+            <div class="drop-empty" id="drop-empty">
+              <span>ここにファイルをドラッグするか、</span>
+              <button type="button" class="btn btn-small" id="file-choose" aria-describedby="file-label file-types">ファイルを選ぶ</button>
+              <span class="hint" id="file-types">wav・mp3・flac・m4a など</span>
+            </div>
+            <div class="drop-chosen" id="drop-chosen" hidden>
+              <span class="drop-name" id="file-name"></span>
+              <span class="drop-size hint" id="file-size"></span>
+              <button type="button" class="btn btn-small btn-quiet" id="file-clear">外す</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="url-input">または音源の URL</label>
+          <input type="url" id="url-input" name="url" inputmode="url" autocomplete="off" spellcheck="false"
+                 placeholder="https://…" aria-describedby="url-note">
+          <p class="hint" id="url-note">ファイルと URL はどちらか一方を使います。</p>
+        </div>
+
+        <div class="field">
+          <div class="label-row">
+            <label class="label" for="lyrics-input">歌詞<span class="optional">任意</span></label>
+            <button type="button" class="btn btn-small btn-quiet" id="lyrics-file-btn">テキストファイルから読む</button>
+            <input type="file" id="lyrics-file" hidden tabindex="-1" accept=".txt,text/plain">
+          </div>
+          <textarea id="lyrics-input" name="lyrics" rows="7" spellcheck="false"
+                    aria-describedby="lyrics-note"></textarea>
+          <p class="hint" id="lyrics-note">1 行が譜面の 1 行になります。空行は区間の区切りです。歌詞があると、コードを歌詞の文字の上に置きます。</p>
+        </div>
+
+        <div class="field-pair">
+          <div class="field">
+            <label class="label" for="title-input">題名<span class="optional">任意</span></label>
+            <input type="text" id="title-input" name="title" autocomplete="off" aria-describedby="meta-note">
+          </div>
+          <div class="field">
+            <label class="label" for="artist-input">アーティスト<span class="optional">任意</span></label>
+            <input type="text" id="artist-input" name="artist" autocomplete="off" aria-describedby="meta-note">
+          </div>
+        </div>
+        <p class="hint hint-tight" id="meta-note">空なら、URL の情報・音源のタグ・ファイル名から決まります。</p>
+
+        <details class="advanced" id="advanced">
+          <summary>詳細な設定</summary>
+          <div class="advanced-body" id="advanced-body">
+            <p class="hint">設定を読み込んでいます…</p>
+          </div>
+        </details>
+
+        <div class="submit-row">
+          <button type="submit" class="btn btn-primary" id="submit-btn">解析を始める</button>
+          <span class="submit-status" id="submit-status" aria-live="polite"></span>
+        </div>
+        <div class="upload-bar" id="upload-bar" hidden><span></span></div>
+        <p class="form-error" id="form-error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <section class="panel" aria-labelledby="jobs-heading">
+      <h2 id="jobs-heading" class="panel-title">進み具合</h2>
+      <div id="jobs" class="jobs"></div>
+      <p class="empty" id="jobs-empty">まだ解析していません。音源を入れて「解析を始める」を押してください。解析には数分かかります。</p>
+    </section>
+
+  </div>
+
+  <div class="col col-right">
+    <section class="panel panel-result" id="result" aria-labelledby="result-heading" tabindex="-1">
+      <div class="result-head">
+        <h2 id="result-heading" class="panel-title">下書き</h2>
+        <div class="result-actions" id="result-actions" hidden>
+          <a class="btn btn-small" id="download-btn" href="#" download>ファイルを保存</a>
+          <button type="button" class="btn btn-small" id="open-folder-btn">フォルダを開く</button>
+          <span class="delete-wrap" id="delete-wrap">
+            <button type="button" class="btn btn-small btn-danger-quiet" id="delete-btn">削除</button>
+          </span>
+        </div>
+      </div>
+      <p class="form-error" id="result-error" role="alert" hidden></p>
+      <div id="preview" class="preview">
+        <p class="empty">解析が終わると、ここにコード譜の下書きが出ます。下の一覧から前の結果も開けます。</p>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="outputs-heading">
+      <div class="result-head">
+        <h2 id="outputs-heading" class="panel-title">これまでの結果</h2>
+        <button type="button" class="btn btn-small btn-quiet" id="outputs-reload">読み直す</button>
+      </div>
+      <div id="outputs" class="outputs"></div>
+    </section>
+  </div>
+</main>
+
+<div class="live visually-hidden" id="live" aria-live="polite" aria-atomic="true"></div>
+
+<div class="shutdown-screen" id="shutdown-screen" hidden>
+  <div class="shutdown-box" role="status">
+    <p class="shutdown-title">サーバーを止めました</p>
+    <p>このタブは閉じてかまいません。また使うときは run.bat を起動してください。</p>
+  </div>
+</div>
+</body>
+</html>

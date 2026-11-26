@@ -48,9 +48,37 @@ Windows に入れるのは GPU のドライバだけです。WSL は使いませ
 ## 使い方
 
 1. このフォルダを `C:\chordgen` などに置きます（git clone でも zip の展開でも）。
-2. `run.bat` をダブルクリックするか、コマンドプロンプトで実行します。初回は自動でセットアップが走ります
-   （`setup.bat` を先に実行しても同じです）。
-3. 解析します。
+2. `run.bat` をダブルクリックします。初回は自動でセットアップが走ります（`setup.bat` を先に実行しても同じです）。
+3. ブラウザで画面が開きます（下の「画面（GUI）」）。音源のファイルを選ぶか URL を入れて、解析を始めます。
+
+- 出力は `output\` に、取得した音源などの作業ファイルは `work\` に置かれます。
+
+### 画面（GUI）
+
+`run.bat` を引数なしで実行すると、ローカルのサーバー（`python -m chordgen.gui`）が立ち上がり、ブラウザで画面が開きます。
+ComfyUI などと同じ形で、画面はこのパソコンの中だけで動きます（外部のサイトや CDN には繋ぎません）。
+
+- コンソールに `http://127.0.0.1:8765/?t=…` の形の URL が出ます。ブラウザが開かないときや、閉じてしまったときは、
+  この URL を開いてください。`t=` の後ろは起動のたびに変わる合言葉で、ほかのサイトから解析を投げ込まれたり、
+  結果を読まれたりしないためのものです（合言葉なしで開くと「コンソールに出ている URL から開いてください」と出ます）。
+- 終わるときは、画面の「終了」を押すか、コンソールで Ctrl+C を押します（実行中の解析は止めます）。
+- 解析は 1 件ずつ順に走ります（GPU を取り合わないため）。続けて投入すると待ちの列に並びます。中止もできます。
+- 8765 番のポートが使われているときは、空いているポートを探して使います。もう起動しているときに `run.bat` を
+  もう一度実行すると、起動中の画面をブラウザで開いて終わります。
+- 画面から投入した音源は `work\gui\uploads\` に置き、解析が終わったら消します（「作業ファイルを残す」のときは残します）。
+  ジョブの一覧は `work\gui\jobs.json` に書いておき、起動し直しても新しい 100 件まで残ります。
+
+```bat
+run.bat --gui --port 8800          :: ポートを指定する（使用中ならエラー）
+run.bat --gui --no-browser         :: ブラウザを自動で開かない
+```
+
+セットアップを済ませた後に画面の部品（fastapi・uvicorn・python-multipart）が足されたので、前から使っている
+フォルダで「画面に要るライブラリが入っていません」と出たら、`setup.bat` をもう一度実行してください。
+
+### コマンドライン
+
+引数をつけて `run.bat` を実行すると、画面を使わずに解析します。
 
 ```bat
 run.bat 自作の曲.wav
@@ -60,8 +88,6 @@ run.bat "https://example.com/watch?v=xxxx"
 
 - URL は `&` を含むことが多いので、必ず `"` で囲んでください。
 - 引数の一覧は `run.bat --help`（`python -m chordgen.cli --help` と同じ）で見てください。
-  `run.bat` を引数なしで実行してもヘルプが出ます。
-- 出力は `output\` に、取得した音源などの作業ファイルは `work\` に置かれます。
 
 ### セットアップ（`setup.bat`）
 
@@ -172,7 +198,7 @@ uv pip install -e ".[dev]"
 
 | ファイル | 役目 |
 |---|---|
-| `run.bat` | 環境変数をこのフォルダに向けて `python -m chordgen.cli` を起動。未セットアップならセットアップを走らせる。cmd.exe はコンソールのコードページで .bat を読むので ASCII だけで書く |
+| `run.bat` | 環境変数をこのフォルダに向けて、引数なしなら `python -m chordgen.gui`、引数があれば `python -m chordgen.cli` を起動。未セットアップならセットアップを走らせる。cmd.exe はコンソールのコードページで .bat を読むので ASCII だけで書く |
 | `setup.bat` | `run.bat --setup` を呼ぶだけ |
 | `portable\bootstrap.ps1` | Python と Node.js の取得・展開（Windows PowerShell 5.1。UTF-8 BOM 付き） |
 | `portable\install.py` | GPU の判定・PyTorch・依存・media-dl・確認。`--dry-run` で手順だけ表示できる（Linux でも動く） |
@@ -180,10 +206,21 @@ uv pip install -e ".[dev]"
 | `portable\requirements-*.txt` | 解析のライブラリ。torch は書かない。install.py が `runtime\torch-constraints.txt` を `-c` で渡して torch を固定する。依存を解決させたくないものは `requirements-nodeps.txt`（`--no-deps`） |
 | `portable\check_outside_writes.py` | フォルダの外への書き出しを調べる |
 | `package.json` | media-dl（GitHub Release の tarball）。版を替えるときはこの URL だけを直す |
+| `chordgen\gui\` | 画面のサーバー（FastAPI）。API は `chordgen\gui\API.md`。画面は `static\` の静的ファイルで、ビルドの手順はない |
+
+画面を作るときは、本物の解析の代わりに偽のジョブを走らせられます（数秒で全段の進捗を出し、サンプルを元にした文書を書く。
+URL や題名に `fail` を入れると失敗、`slow` で遅く、`warn` で警告）。
+
+```bash
+CHORDGEN_GUI_FAKE=1 .venv/bin/python -m chordgen.gui
+```
 
 ### まだ確かめていないこと
 
 - Windows の実機での起動（WSL の中から cmd.exe で run.bat の環境変数の設定までは確かめた）。
+  画面は、Windows の Python 3.12 で `run.bat --gui --no-browser`（cmd.exe）から偽のジョブまで動くことと、
+  中止のときの `taskkill /T /F` で孫のプロセスまで止まることを確かめた。ブラウザの自動起動と、
+  本物の解析（torch を使う段）を画面から走らせることは、まだ確かめていない。
 - media-dl の tarball は、まだ GitHub Release に添付されていません。`package.json` の URL
   （タグ `v1.5.0` は仮）は、添付されたら実際のタグに直してください。取得できない間は、セットアップは
   media-dl を飛ばして続け、ファイルの入力だけが使えます。
