@@ -1,6 +1,6 @@
 [project]
 name = "chordgen"
-version = "0.2.0"
+version = "0.2.1"
 description = "音源を解析して CaT4G Song Format v1 (.cat4g.json) の下書きを出力する"
 requires-python = ">=3.12,<3.13"
 # torch / torchaudio は GPU ごとに別の配布元から入れるので、ここには書かない（portable/ のセットアップが入れる）
