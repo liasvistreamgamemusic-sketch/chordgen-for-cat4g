@@ -184,6 +184,9 @@ class _StageRunner:
             root.removeHandler(collect)
             label = STAGE_LABELS.get(stage, stage)
             for w in caught:
+                # ライブラリの後始末の漏れ（unclosed file など）は利用者に関係がないので出さない
+                if issubclass(w.category, ResourceWarning):
+                    continue
                 text = str(w.message)
                 if text not in collect.messages:
                     logger.warning("%s: %s", label, text)
