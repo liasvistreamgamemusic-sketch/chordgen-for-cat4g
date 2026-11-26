@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import secrets
@@ -82,10 +83,40 @@ def _missing_deps_message(e: ImportError) -> str:
     )
 
 
+def pid_alive(pid: int) -> bool:
+    """そのプロセスが生きているか。"""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 class InstanceLock:
     """同じアプリのフォルダで画面を二重に起動しないための鍵（work/gui/server.lock）。
 
-    起動中のサーバーの URL は server.json に書いておき、二つ目の起動はそれをブラウザで開いて終わる。
+    起動中のサーバーの URL（合言葉つき）は server.json に書いておき、二つ目の起動はそれをブラウザで開いて終わる。
+    server.json は本人だけが読める権限（POSIX で 0o600）で書き、終わるとき（atexit でも）消す。
     """
 
     def __init__(self, gui_dir: Path):
@@ -111,37 +142,69 @@ class InstanceLock:
             f.close()
             return False
         self._f = f
+        self._remove_info()  # 鍵が取れたなら、残っている server.json は前の起動の古いもの
         return True
 
     def publish(self, url: str, port: int) -> None:
-        data = {"url": url, "port": port, "pid": os.getpid()}
+        """server.json を書く。一時ファイルを 0o600 で作ってから置き換える。
+
+        Windows では mode は効かないが、置き場所はアプリのフォルダ（work/gui）の中で、権限はそのフォルダに従う。
+        """
+        data = json.dumps({"url": url, "port": port, "pid": os.getpid()}).encode("utf-8")
+        tmp = self.info_path.with_name(self.info_path.name + ".tmp")
         try:
-            self.info_path.write_text(json.dumps(data), encoding="utf-8")
+            tmp.unlink(missing_ok=True)  # 既にあるファイルには O_CREAT の mode が効かないので消しておく
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0), 0o600)
+            try:
+                os.write(fd, data)
+            finally:
+                os.close(fd)
+            os.replace(tmp, self.info_path)
         except OSError:
-            pass
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def running_url(self) -> str | None:
-        """起動中のサーバーの URL。応えないときは None。"""
+        """起動中のサーバーの URL。書いた pid が生きていて、その URL の /api/info が合言葉つきで応えたときだけ返す。
+
+        pid が止まっている・読めない server.json は消す。
+        """
         try:
             data = json.loads(self.info_path.read_text(encoding="utf-8"))
-            url, port = str(data["url"]), int(data["port"])
+            url, port, pid = str(data["url"]), int(data["port"]), int(data["pid"])
             token = parse_qs(urlparse(url).query)["t"][0]
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError, KeyError, IndexError, TypeError):
+            self._remove_info()
+            return None
+        if not pid_alive(pid):
+            self._remove_info()
+            return None
+        try:
             req = urllib.request.Request(f"http://127.0.0.1:{port}/api/info", headers={TOKEN_HEADER: token})
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # プロキシの設定を通さない
             with opener.open(req, timeout=5) as r:
                 if r.status == 200:
                     return url
-        except (OSError, ValueError, KeyError, IndexError, TypeError):
+        except (OSError, ValueError):
             pass
         return None
 
+    def _remove_info(self) -> None:
+        for p in (self.info_path, self.info_path.with_name(self.info_path.name + ".tmp")):
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
+
     def release(self) -> None:
+        """server.json を消して鍵を外す。何度呼んでもよい（finally と atexit の両方から呼ぶ）。"""
         if self._f is None:
             return
-        try:
-            self.info_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        self._remove_info()
         try:
             self._f.close()  # 閉じれば鍵も外れる
         except OSError:
@@ -183,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.no_browser:
             _open_browser(url)
         return 0
+    atexit.register(lock.release)  # 異常終了でも合言葉つきの URL を残さない
 
     try:
         if args.host != "127.0.0.1":

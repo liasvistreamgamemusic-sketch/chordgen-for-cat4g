@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -67,6 +69,49 @@ def test_instance_lock(tmp_path):
     assert not (tmp_path / "server.json").exists()
     assert b.acquire()
     b.release()
+
+
+def test_server_json_is_private_and_removed(tmp_path):
+    lock = InstanceLock(tmp_path)
+    assert lock.acquire()
+    try:
+        lock.publish("http://127.0.0.1:1/?t=secret", 1)
+        info = tmp_path / "server.json"
+        assert json.loads(info.read_text(encoding="utf-8"))["pid"] == os.getpid()
+        if os.name != "nt":
+            assert stat.S_IMODE(info.stat().st_mode) == 0o600
+        assert not (tmp_path / "server.json.tmp").exists()
+    finally:
+        lock.release()
+    assert not (tmp_path / "server.json").exists()
+    lock.release()  # 二度目（atexit から）でも落ちない
+
+
+def test_stale_server_json_is_ignored_and_removed(tmp_path):
+    holder = InstanceLock(tmp_path)
+    assert holder.acquire()
+    try:
+        info = tmp_path / "server.json"
+        # 止まったプロセスの pid（自分の子を待ち終えたもの）
+        dead = subprocess.Popen([sys.executable, "-c", "pass"])
+        dead.wait()
+        info.write_text(json.dumps({"url": "http://127.0.0.1:1/?t=x", "port": 1, "pid": dead.pid}), encoding="utf-8")
+        assert InstanceLock(tmp_path).running_url() is None
+        assert not info.exists()
+        info.write_text("{broken", encoding="utf-8")
+        assert InstanceLock(tmp_path).running_url() is None
+        assert not info.exists()
+        # 生きている pid でも、応えなければ使わない（消しはしない）
+        info.write_text(json.dumps({"url": "http://127.0.0.1:1/?t=x", "port": 1, "pid": os.getpid()}), encoding="utf-8")
+        assert InstanceLock(tmp_path).running_url() is None
+    finally:
+        holder.release()
+    # 鍵が取れたときは、残っている server.json を古いものとして消す
+    info.write_text("{}", encoding="utf-8")
+    fresh = InstanceLock(tmp_path)
+    assert fresh.acquire()
+    assert not info.exists()
+    fresh.release()
 
 
 def test_missing_dependencies_message(monkeypatch, capsys, app_home):
