@@ -127,6 +127,20 @@ def test_bad_origin_is_rejected_for_state_changes(gui):
     gui.wait(r.json()["id"])
 
 
+def test_static_files_are_not_cached_stale(gui):
+    bare = _bare(gui)
+    for path in ("/app.js", "/api.js", "/util.js", "/app.css"):
+        r = bare.get(path)
+        assert r.status_code == 200, path
+        assert r.headers["cache-control"] == "no-cache", path
+    bare.get(f"/?t={TOKEN}")
+    r = bare.get("/")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
+    # 合言葉の Cookie を付けるリダイレクトと API は残さない
+    assert bare.get(f"/?t={TOKEN}", follow_redirects=False).headers["cache-control"] == "no-store"
+    assert gui.client.get("/api/info").headers["cache-control"] == "no-store"
+
+
 def test_static_files_are_served(gui):
     bare = _bare(gui)
     r = bare.get("/util.js")

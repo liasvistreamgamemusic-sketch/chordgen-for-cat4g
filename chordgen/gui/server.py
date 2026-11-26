@@ -122,6 +122,7 @@ class _Guard:
                     (b"cross-origin-resource-policy", b"same-origin"),
                 ]
                 if b"cache-control" not in names:
+                    # API と / のリダイレクト・案内のページは残さない。静的ファイルは no-cache（毎回 ETag で確かめる）
                     extra.append((b"cache-control", b"no-store" if is_api or path == "/" else b"no-cache"))
                 hs += [(k, v) for k, v in extra if k not in names]
                 message = {**message, "headers": hs}
@@ -357,7 +358,8 @@ def create_app(config: ServerConfig) -> FastAPI:
         index_html = STATIC_DIR / "index.html"
         if not index_html.is_file():
             return _page("画面のファイル（chordgen/gui/static/index.html）がありません。", 500)
-        return FileResponse(index_html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
+        # 静的ファイルと同じく no-cache（版を上げたあと古い画面や ES モジュールを使い続けないよう、毎回確かめさせる）
+        return FileResponse(index_html, media_type="text/html; charset=utf-8", headers={"Cache-Control": "no-cache"})
 
     @app.get("/index.html", include_in_schema=False)
     async def index_html_redirect():

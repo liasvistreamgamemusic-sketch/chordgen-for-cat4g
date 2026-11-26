@@ -22,7 +22,8 @@
 - `/index.html` は `/` へ移す。静的ファイル（`/app.js` など）は合言葉なしで配る（秘密は入っていない）。
 - 画面は同じオリジンの `fetch` と `EventSource` を使えば Cookie が自動で付く。
 - すべての応答に `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、
-  `Content-Security-Policy: frame-ancestors 'none'` を付ける。`/api/` と `/` は `Cache-Control: no-store`。
+  `Content-Security-Policy: frame-ancestors 'none'` を付ける。`Cache-Control` は、画面（`/` の index.html と `/app.js` などの静的ファイル）が
+  `no-cache`（版を上げたあと古い ES モジュールを使い続けないよう毎回確かめさせる）、`/api/` と `/` のリダイレクト・案内のページが `no-store`。
 
 ## GET /api/info
 
